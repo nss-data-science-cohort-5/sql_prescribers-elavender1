@@ -46,8 +46,48 @@ ORDER BY daily_unit_drug_cost DESC
 LIMIT 10
 --3b) Carimune NF Nanofiltered cost $3188.16 per daily dose cost.
 
+--4a)
+SELECT drug_name,
+		CASE WHEN opioid_drug_flag='Y' THEN 'opioid'
+			WHEN antibiotic_drug_flag='Y' THEN 'antibiotic'
+			ELSE 'neither'
+			END AS drug_type
+FROM drug
+ORDER BY drug_type
+--
+--4b)
+SELECT 
+		CASE WHEN opioid_drug_flag='Y' THEN 'opioid'
+			WHEN antibiotic_drug_flag='Y' THEN 'antibiotic'
+			ELSE 'neither'
+			END AS drug_type,
+			SUM(total_drug_cost)::money AS total_drug_cost
+FROM drug
+INNER JOIN prescription 
+USING (drug_name)
+GROUP BY drug_type
+ORDER BY total_drug_cost DESC
+--opioids are more expensive than antibiotics but not as expensive as the neither category.
+
 --5a)
 SELECT count(distinct cbsa)
+FROM cbsa
+INNER JOIN fips_county
+USING (fipscounty)
+WHERE state = 'TN'
+--10 in Tennessee
+
+--5b)
+SELECT cbsaname,
+	   SUM(population) AS total_population 
+FROM cbsa
+INNER Join fips_county
+USING (fipscounty)
+INNER Join population
+USING (fipscounty)
+GROUP BY cbsaname
+ORDER BY total_population 
+--"Nashville-Davidson--Murfreesboro--Franklin, TN" has the largest total population at 1830410. "Morristown, TN" has the smallest at 116352.
 
 
 --5c)
