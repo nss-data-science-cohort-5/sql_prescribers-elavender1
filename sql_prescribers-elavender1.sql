@@ -100,7 +100,7 @@ USING (fipscounty)
 WHERE cbsa IS NULL
 AND population IS NOT NULL
 ORDER BY population DESC
---Sevier is the smallest
+--Sevier has the highest population with no cbsa.
 
 --6a) Find all rows in the prescription table where total_claims is at least 3000. Report the drug_name and the total_claim_count.
 SELECT drug_name, total_claim_count
@@ -178,10 +178,143 @@ AND opioid_drug_flag = 'Y'
 GROUP BY npi, drug_name, sum_claim_count
 ORDER BY sum_claim_count DESC
 
+--part 2.1)
+SELECT COUNT(npi)
+FROM prescriber 
+WHERE npi NOT IN 
+	(SELECT npi
+	FROM prescription)
+--
+--2.2a) Find the top five drugs (generic_name) prescribed by prescribers with the specialty of Family Practice.
+--SELECT specialty_description, sum(total_claim_count) AS total_count
+SELECT generic_name, SUM(total_claim_count) AS sum_total_ct
+FROM prescriber
+INNER JOIN prescription 
+USING (npi)
+INNER JOIN drug
+USING (drug_name)
+WHERE specialty_description = 'Family Practice'
+GROUP BY generic_name
+ORDER BY sum_total_ct DESC
+limit 5
+--2.2B Find the top five drugs (generic_name) prescribed by prescribers with the specialty of Cardiology.
+SELECT generic_name, SUM(total_claim_count) AS sum_total_ct
+FROM prescriber
+INNER JOIN prescription 
+USING (npi)
+INNER JOIN drug
+USING (drug_name)
+WHERE specialty_description = 'Cardiology'
+GROUP BY generic_name
+ORDER BY sum_total_ct DESC
+limit 5
+--2.2C Which drugs appear in the top five prescribed for both Family Practice prescribers and Cardiologists? 
+--Combine what you did for parts a and b into a single query to answer this question.
+SELECT generic_name, SUM(total_claim_count) AS sum_tot_ct
+FROM prescriber
+INNER JOIN prescription 
+USING (npi)
+INNER JOIN drug
+USING (drug_name)
+WHERE specialty_description = 'Cardiology' OR specialty_description = 'Family Practice'
+GROUP BY generic_name
+ORDER BY sum_tot_ct DESC
+limit 5
+--2.3a)  First, write a query that finds the top 5 prescribers in Nashville in terms of the total number of claims 
+--(total_claim_count) across all drugs. 
+--Report the npi, the total number of claims, and include a column showing the city.
+SELECT npi, SUM(total_claim_count) AS total_num_claims, nppes_provider_first_name || ' ' || nppes_provider_last_org_name AS provider, nppes_provider_city 
+FROM prescriber
+INNER JOIN prescription 
+USING (npi)
+INNER JOIN drug
+USING (drug_name)
+WHERE nppes_provider_city = 'NASHVILLE'
+GROUP BY npi, provider, nppes_provider_city
+ORDER BY total_num_claims DESC
+LIMIT 5
+--2.3b) Same for Memphis
+SELECT npi, SUM(total_claim_count) AS total_num_claims, nppes_provider_first_name || ' ' || nppes_provider_last_org_name AS provider, nppes_provider_city 
+FROM prescriber
+INNER JOIN prescription 
+USING (npi)
+INNER JOIN drug
+USING (drug_name)
+WHERE nppes_provider_city = 'MEMPHIS'
+GROUP BY npi, provider, nppes_provider_city
+ORDER BY total_num_claims DESC
+LIMIT 5
+--2.3C) Combine above with Knoxville and Chattanooga
+SELECT npi, SUM(total_claim_count) AS total_num_claims, nppes_provider_first_name || ' ' || nppes_provider_last_org_name AS provider, nppes_provider_city 
+FROM prescriber
+INNER JOIN prescription 
+USING (npi)
+INNER JOIN drug
+USING (drug_name)
+WHERE nppes_provider_city = 'MEMPHIS' OR nppes_provider_city = 'NASHVILLE' OR nppes_provider_city = 'KNOXVILLE' OR nppes_provider_city = 'CHATTANOOGA'
+GROUP BY npi, provider, nppes_provider_city
+ORDER BY total_num_claims DESC
+LIMIT 20
+--2.4 Find all counties which had an above-average (for the state) number of overdose deaths in 2017. 
+--Report the county name and number of overdose deaths.
+SELECT county, state, overdose_deaths
+FROM fips_county
+INNER JOIN overdose_deaths
+USING (fipscounty)
+WHERE year = '2017' AND overdose_deaths >
+	(SELECT AVG(overdose_deaths) AS avg_overdose
+	FROM overdose_deaths
+	INNER JOIN fips_county
+	USING (fipscounty)
+	WHERE year = '2017' AND state = 'TN')
+GROUP BY county, state, overdose_deaths
+ORDER BY overdose_deaths
+--21 counties 
 
+SELECT *
+FROM overdose_deaths
+INNER JOIN fips_county
+USING (fipscounty)
+WHERE year = 2017
+OrDER BY overdose_deaths DESC
+limit 50
+--2.5 find total population of TN
+SELECT sum(population) AS tn_total_population
+FROM population
+INNER JOIN fips_county
+USING (fipscounty)
+--total population is 6,597,381
 
+--2.5b Build off of the query that you wrote in part a to write a query that returns for each county that county's name, 
+--its population, and the percentage of the total population of Tenn
+SELECT county, population, round(100 * population / (SELECT sum(population) 
+	FROM population
+	INNER JOIN fips_county
+	USING (fipscounty)), 2) AS percent_population
+FROM population
+INNER JOIN fips_county
+USING (fipscounty)
 
+--Using CTEs
+WITH state_pop AS 
+(
+SELECT SUM(population) AS state_population
+FROM population
+INNER JOIN fips_county
+USING (fipscounty)
+),
 
+county_pop AS 
+(
+SELECT county, SUM(population) AS county_population
+FROM population
+INNER JOIN fips_county
+USING (fipscounty)
+GROUP BY county
+)
 
+SELECT county, county_population,
+	ROUND(county_population * 100.00/ (SELECT state_population FROM state_pop), 2) AS percentage
+	FROM county_pop
 
 
